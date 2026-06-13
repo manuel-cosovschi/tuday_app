@@ -260,11 +260,15 @@ export function AddTaskModal({
       <style jsx global>{`
         .input {
           width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
           border-radius: 0.75rem;
           border: 1px solid rgb(226 232 240);
           background: transparent;
           padding: 0.625rem 0.75rem;
           outline: none;
+          -webkit-appearance: none;
+          appearance: none;
         }
         .dark .input {
           border-color: rgb(51 65 85);
@@ -279,7 +283,7 @@ export function AddTaskModal({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className="min-w-0">
       <label className="mb-1 block text-xs font-medium text-slate-500">{label}</label>
       {children}
     </div>
