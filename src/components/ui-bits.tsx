@@ -113,7 +113,7 @@ export function Fab({ onClick }: { onClick: () => void }) {
     <button
       onClick={onClick}
       aria-label="Agregar tarea"
-      className="fixed bottom-[max(5rem,calc(env(safe-area-inset-bottom)+5rem))] right-4 z-30 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-600/40 transition active:scale-90"
+      className="fixed bottom-[max(6.5rem,calc(env(safe-area-inset-bottom)+6.5rem))] right-4 z-30 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-600/40 transition active:scale-90"
     >
       <Plus className="h-7 w-7" />
     </button>
