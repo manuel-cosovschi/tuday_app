@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { TaskInstance } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import { PRIORITY_BAR, PRIORITY_CHIP, PRIORITY_LABEL, TYPE_LABEL } from '@/lib/ui';
-import { Check, Clock, MoreHorizontal, X, AlarmClock, Pencil } from 'lucide-react';
+import { Check, Clock, MoreHorizontal, X, AlarmClock, Pencil, Trash2 } from 'lucide-react';
 
 export function TaskCard({
   inst,
@@ -16,7 +16,16 @@ export function TaskCard({
   const { task, date, status, isOverdue } = inst;
   const setStatus = useStore((s) => s.setStatus);
   const snooze = useStore((s) => s.snooze);
+  const deleteTask = useStore((s) => s.deleteTask);
   const [open, setOpen] = useState(false);
+
+  const recurring = task.type !== 'unica';
+  function handleDelete() {
+    const msg = recurring
+      ? `Eliminar "${task.title}" para TODOS los días. Esta acción no se puede deshacer. ¿Continuar?`
+      : `Eliminar "${task.title}". ¿Continuar?`;
+    if (window.confirm(msg)) deleteTask(task.id);
+  }
 
   const done = status === 'completada';
   const cancelled = status === 'cancelada';
@@ -101,13 +110,16 @@ export function TaskCard({
             Mañana
           </Action>
           <Action onClick={() => setStatus(task, date, 'cancelada')} icon={<X className="h-3.5 w-3.5" />}>
-            Cancelar
+            {recurring ? 'Cancelar hoy' : 'Cancelar'}
           </Action>
           {onEdit && (
             <Action onClick={() => onEdit(task.id)} icon={<Pencil className="h-3.5 w-3.5" />}>
               Editar
             </Action>
           )}
+          <Action onClick={handleDelete} icon={<Trash2 className="h-3.5 w-3.5" />} danger>
+            {recurring ? 'Eliminar serie' : 'Eliminar'}
+          </Action>
         </div>
       )}
     </div>
@@ -118,15 +130,21 @@ function Action({
   children,
   onClick,
   icon,
+  danger,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   icon: React.ReactNode;
+  danger?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 font-medium text-slate-600 active:scale-95 dark:bg-slate-800 dark:text-slate-300"
+      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 font-medium active:scale-95 ${
+        danger
+          ? 'bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300'
+          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+      }`}
     >
       {icon}
       {children}
