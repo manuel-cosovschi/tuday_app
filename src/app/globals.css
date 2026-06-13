@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f4f5f8;
+  --bg-grad: radial-gradient(120% 80% at 50% -10%, #eef0ff 0%, #f4f5f8 45%);
+  --card: #ffffff;
+  --hairline: rgba(15, 23, 42, 0.07);
+  --accent: #6366f1;
+  --accent-2: #8b5cf6;
+}
+.dark {
+  --bg: #070a0f;
+  --bg-grad: radial-gradient(120% 80% at 50% -10%, #16183a 0%, #070a0f 50%);
+  --card: #11161f;
+  --hairline: rgba(255, 255, 255, 0.08);
+  --accent: #818cf8;
+  --accent-2: #a78bfa;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  background-image: var(--bg-grad);
+  background-attachment: fixed;
+  color: #0f172a;
+  /* Safe areas para iPhone (notch / barra inferior). */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+}
+.dark body {
+  color: #e7e9ee;
+}
+
+/* Tarjeta base: hairline + sombra suave para look moderno */
+.card {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.04), 0 8px 24px -16px rgba(2, 6, 23, 0.25);
+}
+.dark .card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -20px rgba(0, 0, 0, 0.8);
+}
+
+/* Hero con degradé de marca */
+.hero {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  color: #fff;
+  border-radius: 1.5rem;
+  box-shadow: 0 18px 40px -22px rgba(99, 102, 241, 0.8);
+}
+
+/* Texto con degradé */
+.text-grad {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Evita zoom al enfocar inputs en iOS (font-size >= 16px). */
+input,
+select,
+textarea,
+button {
+  font-size: 16px;
+}
+
+/* Scrollbar discreta en desktop */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3);
+  border-radius: 999px;
+}
