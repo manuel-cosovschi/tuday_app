@@ -20,11 +20,13 @@ export function AddTaskModal({
   onClose,
   editId,
   defaultType = 'unica',
+  defaultDate,
 }: {
   open: boolean;
   onClose: () => void;
   editId?: string | null;
   defaultType?: TaskType;
+  defaultDate?: string;
 }) {
   const tasks = useStore((s) => s.tasks);
   const addTask = useStore((s) => s.addTask);
@@ -63,7 +65,7 @@ export function AddTaskModal({
       setCategory(DEFAULT_CATEGORIES[0]);
       setPriority('media');
       setType(defaultType);
-      setDue(dateKey());
+      setDue(defaultDate ?? dateKey());
       setTime('');
       setDurationMin('');
       setDays([1, 2, 3, 4, 5]);
