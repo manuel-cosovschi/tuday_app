@@ -250,13 +250,19 @@ export const useStore = create<State>()(
           const owner = ownerId();
           if (!owner) return;
           set({ loading: true });
-          const [{ data: taskRows }, { data: logRows }] = await Promise.all([
+          const [taskRes, logRes] = await Promise.all([
             supabase.from('tuday_tasks').select('*').eq('owner_id', owner).order('created_at'),
             supabase.from('tuday_task_logs').select('*').eq('owner_id', owner),
           ]);
-          const tasks = (taskRows ?? []).map(rowToTask);
+          // IMPORTANTE: si la consulta falla (base caída/pausada, red), NO tocar el
+          // estado actual. Nunca vaciar la lista por un error transitorio.
+          if (taskRes.error || logRes.error) {
+            set({ loading: false });
+            return;
+          }
+          const tasks = (taskRes.data ?? []).map(rowToTask);
           const completions: Completions = {};
-          for (const r of logRows ?? []) {
+          for (const r of logRes.data ?? []) {
             completions[r.task_id] = completions[r.task_id] ?? {};
             completions[r.task_id][r.date] = {
               status: r.status,
