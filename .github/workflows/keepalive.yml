@@ -1,0 +1,22 @@
+name: Supabase keep-alive
+
+# Los proyectos gratis de Supabase se pausan tras varios días de inactividad.
+# Este ping periódico mantiene la base "despierta" para evitar cortes.
+on:
+  schedule:
+    - cron: '0 */6 * * *' # cada 6 horas
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST
+        run: |
+          code=$(curl -sS -o /dev/null -w "%{http_code}" \
+            "https://iemrjdeefsfwomogbise.supabase.co/rest/v1/tuday_profiles?select=id&limit=1" \
+            -H "apikey: sb_publishable_Mzd_bk0RtitS13mpdKYefw_EIgPZWb1" \
+            -H "Authorization: Bearer sb_publishable_Mzd_bk0RtitS13mpdKYefw_EIgPZWb1")
+          echo "HTTP $code"
+          # 200 (o 401/403 por RLS) significa que la base respondió = está activa.
+          if [ "$code" = "000" ]; then echo "sin respuesta"; exit 1; fi
