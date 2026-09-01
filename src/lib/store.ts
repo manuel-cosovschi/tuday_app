@@ -221,10 +221,13 @@ export const useStore = create<State>()(
           const { data, error } = await supabase.auth.signUp({
             email,
             password,
-            options: { data: { name } },
+            options: { data: { name, app: 'tuday' } },
           });
           if (error) throw error;
-          return { needsConfirm: !data.session };
+          if (data.session) return { needsConfirm: false };
+          // Las cuentas de Tuday se confirman al instante (sin email): entramos directo.
+          const { error: e2 } = await supabase.auth.signInWithPassword({ email, password });
+          return { needsConfirm: !!e2 };
         },
 
         signIn: async (email, password) => {
