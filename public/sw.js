@@ -1,5 +1,5 @@
 /* Tuday Service Worker — caché básico offline + manejo de notificaciones. */
-const CACHE = 'tuday-v1';
+const CACHE = 'tuday-v2';
 const APP_SHELL = ['/', '/semana', '/habitos', '/ajustes', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {

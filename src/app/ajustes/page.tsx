@@ -12,6 +12,7 @@ import {
   vibrate,
 } from '@/lib/notifications';
 import { Bell, Moon, Sun, Smartphone, LogOut, Volume2, Vibrate, Target, Share } from 'lucide-react';
+import { ConnectionCard } from '@/components/ConnectionCard';
 
 export default function SettingsPage() {
   const profile = useStore((s) => s.profile);
@@ -54,6 +55,9 @@ export default function SettingsPage() {
           <LogOut className="h-4 w-4" /> Cerrar sesión
         </button>
       </div>
+
+      {/* Conexión entre personas */}
+      <ConnectionCard />
 
       {/* Tema */}
       <div className="card p-4">

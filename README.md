@@ -5,8 +5,46 @@ organizar tareas diarias/semanales, hábitos y recordatorios, con un sistema de 
 **insistentes** que repite hasta que marcás la tarea como **hecha**, **pospuesta** o
 **cancelada**.
 
-> MVP **local-first**: funciona 100% sin backend (los datos se guardan en el dispositivo).
-> Más abajo está el camino claro para escalar a Supabase con cuentas reales y Web Push.
+> **Ahora con backend (Supabase):** cuentas reales, sincronización entre dispositivos y
+> **modo multiusuario** — podés dejar que otra persona (ej: tu manager) administre tu
+> calendario. La versión inicial fue local-first; los datos locales se importan a la nube
+> al iniciar sesión por primera vez.
+
+---
+
+## Multiusuario: que otra persona maneje tu calendario
+
+- Cada persona tiene su **cuenta** (email + contraseña).
+- En **Ajustes → Compartir / Conexión** generás un **código de invitación** (válido 7 días).
+- La otra persona ingresa ese código en **“Vincularme a un calendario”** y queda habilitada
+  como **manager** con **edición total**: crea, edita, completa, pospone, cancela y borra
+  tus tareas y hábitos.
+- Arriba de la app aparece un selector para cambiar entre **“Mi calendario”** y los
+  calendarios que gestionás. Los cambios se ven **en tiempo real** en ambos dispositivos.
+- Podés **revocar** el acceso cuando quieras desde la misma pantalla.
+
+**Seguridad (RLS):** cada fila de tareas/logs está protegida por *Row Level Security* en
+Postgres. Solo el dueño y los managers explícitamente vinculados pueden leer/escribir; un
+tercero no ve nada. Verificado con pruebas automatizadas de acceso, edición cruzada,
+aislamiento y revocación.
+
+### Base de datos (Supabase)
+
+Tablas con prefijo `tuday_` (aisladas del resto del proyecto):
+`tuday_profiles`, `tuday_tasks`, `tuday_task_logs`, `tuday_memberships` (vínculo
+owner↔manager), `tuday_invites` (códigos). Funciones RPC `SECURITY DEFINER`:
+`tuday_create_invite`, `tuday_redeem_invite`, `tuday_my_workspaces`, `tuday_my_managers`,
+`tuday_has_access`. Realtime habilitado en `tuday_tasks` y `tuday_task_logs`.
+
+### Variables de entorno (opcionales)
+
+La URL y la *publishable key* de Supabase son públicas por diseño y ya vienen embebidas.
+Para sobrescribirlas, definí en Vercel:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+```
 
 ---
 
