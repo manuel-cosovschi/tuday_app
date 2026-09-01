@@ -41,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Aplica el tema antes de pintar para evitar parpadeo. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=JSON.parse(localStorage.getItem('tuday-store-v1')||'{}');var t=s&&s.state&&s.state.settings&&s.state.settings.theme||'system';var m=window.matchMedia('(prefers-color-scheme: dark)').matches;if(t==='dark'||(t==='system'&&m)){document.documentElement.classList.add('dark');}}catch(e){}})();`,
+            __html: `(function(){try{var s=JSON.parse(localStorage.getItem('tuday-settings-v1')||'{}');var t=s&&s.state&&s.state.settings&&s.state.settings.theme||'system';var m=window.matchMedia('(prefers-color-scheme: dark)').matches;if(t==='dark'||(t==='system'&&m)){document.documentElement.classList.add('dark');}}catch(e){}})();`,
           }}
         />
       </head>
