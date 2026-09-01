@@ -44,7 +44,28 @@ Para sobrescribirlas, definí en Vercel:
 ```
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=...   # opcional, para Web Push
 ```
+
+## Notificaciones push (con la app cerrada)
+
+Tuday envía **Web Push** reales desde el servidor, así te llegan avisos aunque no
+tengas la app abierta:
+
+- **Cliente**: en *Ajustes → Activar notificaciones* el dispositivo se suscribe
+  (`pushManager.subscribe` con clave VAPID) y guarda la suscripción + su zona horaria en
+  `tuday_push_subscriptions`.
+- **Servidor**: una **Edge Function** de Supabase (`tuday-push`) se ejecuta **cada minuto**
+  vía `pg_cron` + `pg_net`. Calcula, en la hora local de cada usuario, qué tareas vencen y
+  envía push **insistentes**: 10' antes, en la hora y repetición cada 10' (5' urgentes)
+  hasta marcarla hecha/pospuesta/cancelada. Respeta un horario nocturno (07–24 h) y topea
+  la insistencia para no spamear.
+- **Secretos** (claves VAPID y token del cron) viven en la tabla `tuday_secrets`
+  (solo *service role*), no en el repo.
+
+**Limitaciones iOS**: Web Push en iPhone requiere iOS 16.4+ **y la PWA instalada** (agregada
+a la pantalla de inicio). En Safari sin instalar no hay push; ahí siguen funcionando el
+Modo Enfoque, el sonido y la vibración con la app abierta.
 
 ---
 
