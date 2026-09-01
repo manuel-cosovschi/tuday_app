@@ -13,6 +13,7 @@ import {
 } from '@/lib/notifications';
 import { Bell, Moon, Sun, Smartphone, LogOut, Volume2, Vibrate, Target, Share } from 'lucide-react';
 import { ConnectionCard } from '@/components/ConnectionCard';
+import { subscribeToPush, pushSupported } from '@/lib/push';
 
 export default function SettingsPage() {
   const profile = useStore((s) => s.profile);
@@ -23,6 +24,8 @@ export default function SettingsPage() {
   const [perm, setPerm] = useState<string>('default');
   const [ios, setIos] = useState(false);
   const [standalone, setStandalone] = useState(true);
+  const [pushMsg, setPushMsg] = useState('');
+  const [pushBusy, setPushBusy] = useState(false);
 
   useEffect(() => {
     setPerm(notificationPermission());
@@ -31,11 +34,30 @@ export default function SettingsPage() {
   }, []);
 
   async function enableNotifications() {
-    const res = await requestNotificationPermission();
-    setPerm(res);
-    update({ notificationsEnabled: res === 'granted' });
-    if (res === 'granted') {
-      showSystemNotification('Tuday', { body: '¡Notificaciones activadas! Te vamos a avisar.' });
+    setPushMsg('');
+    setPushBusy(true);
+    try {
+      const res = await requestNotificationPermission();
+      setPerm(res);
+      update({ notificationsEnabled: res === 'granted' });
+      if (res === 'granted') {
+        showSystemNotification('Tuday', { body: '¡Notificaciones activadas! Te vamos a avisar.' });
+        // Suscripción Web Push (para recibir avisos con la app cerrada).
+        if (pushSupported()) {
+          const ok = await subscribeToPush();
+          setPushMsg(
+            ok
+              ? 'Push activado: recibirás avisos aunque cierres la app.'
+              : 'Permiso listo, pero no pudimos registrar el push en este dispositivo.'
+          );
+        }
+      } else {
+        setPushMsg('No se otorgó el permiso de notificaciones.');
+      }
+    } catch {
+      setPushMsg('No se pudo activar el push en este dispositivo.');
+    } finally {
+      setPushBusy(false);
     }
   }
 
@@ -90,15 +112,21 @@ export default function SettingsPage() {
 
         <button
           onClick={enableNotifications}
-          className="mt-3 w-full rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white"
+          disabled={pushBusy}
+          className="mt-3 w-full rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
         >
-          {perm === 'granted'
-            ? 'Notificaciones activadas ✓'
+          {pushBusy
+            ? 'Activando…'
+            : perm === 'granted'
+            ? 'Notificaciones activadas ✓ (reactivar en este dispositivo)'
             : 'Activar notificaciones push'}
         </button>
         <p className="mt-2 text-[11px] text-slate-400">
           Estado del permiso: <b>{perm}</b>
         </p>
+        {pushMsg && (
+          <p className="mt-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400">{pushMsg}</p>
+        )}
 
         <Toggle
           icon={<Target className="h-4 w-4" />}
