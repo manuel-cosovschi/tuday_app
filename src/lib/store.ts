@@ -586,6 +586,45 @@ export const useStore = create<State>()(
 
           const prevCount = get().completions[task.id]?.[date]?.postponeCount ?? 0;
           const newCount = prevCount + 1;
+
+          // "Mañana" en una tarea única: la MOVEMOS al día siguiente. Antes quedaba
+          // con la fecha vieja en estado pospuesta y desaparecía de todas las vistas.
+          if (mode === 'tomorrow' && task.type === 'unica') {
+            const newDate = dateKey(addDays(now, 1));
+            set((s) => ({
+              tasks: s.tasks.map((t) =>
+                t.id === task.id
+                  ? { ...t, dueDate: newDate, status: 'pendiente' as Status }
+                  : t
+              ),
+              completions: writeRecord(s.completions, task.id, date, {
+                status: 'pospuesta',
+                snoozedUntil: undefined,
+                postponeCount: newCount,
+              }),
+            }));
+            void supabase
+              .from('tuday_tasks')
+              .update({ due_date: newDate, status: 'pendiente' })
+              .eq('id', task.id)
+              .then(({ error }) => {
+                if (error) get().loadData();
+              });
+            void supabase.from('tuday_task_logs').upsert(
+              {
+                task_id: task.id,
+                owner_id: owner,
+                date,
+                status: 'pospuesta',
+                postpone_count: newCount,
+                updated_by: userId,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'task_id,date' }
+            );
+            return;
+          }
+
           set((s) => {
             const completions = writeRecord(s.completions, task.id, date, {
               status: 'pospuesta',

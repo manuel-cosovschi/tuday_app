@@ -8,7 +8,7 @@ import { Check, AlarmClock, X, AlertTriangle } from 'lucide-react';
 // Modo enfoque: mientras la app está abierta, insiste con la tarea más urgente
 // hasta que el usuario actúe. Es el fallback principal de "notificación" en iOS.
 export function FocusOverlay() {
-  const { ringing } = useReminders();
+  const { ringing, dismiss } = useReminders();
   const focusMode = useStore((s) => s.settings.focusMode);
   const setStatus = useStore((s) => s.setStatus);
   const snooze = useStore((s) => s.snooze);
@@ -71,12 +71,20 @@ export function FocusOverlay() {
           </button>
         </div>
 
-        <button
-          onClick={() => setStatus(task, date, 'cancelada')}
-          className="mt-3 inline-flex items-center gap-1 text-xs text-slate-400"
-        >
-          <X className="h-3.5 w-3.5" /> Cancelar tarea
-        </button>
+        <div className="mt-3 flex items-center justify-center gap-4 text-xs">
+          <button
+            onClick={() => dismiss(task.id, date)}
+            className="font-medium text-slate-500 dark:text-slate-400"
+          >
+            Ahora no
+          </button>
+          <button
+            onClick={() => setStatus(task, date, 'cancelada')}
+            className="inline-flex items-center gap-1 text-slate-400"
+          >
+            <X className="h-3.5 w-3.5" /> Cancelar tarea
+          </button>
+        </div>
       </div>
     </div>
   );

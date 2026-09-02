@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { useStore } from '@/lib/store';
 import { TaskInstance } from '@/lib/types';
-import { instancesForDate, overdueSingles } from '@/lib/recurrence';
+import { instancesForDate } from '@/lib/recurrence';
 import { dateKey } from '@/lib/date';
 import {
   showSystemNotification,
@@ -13,12 +13,14 @@ import {
 } from '@/lib/notifications';
 
 const TICK_MS = 20_000; // revisa cada 20s
+const DISMISS_MS = 30 * 60_000; // "Ahora no" silencia 30 min
 
 interface ReminderCtx {
   ringing: TaskInstance[];
   ringingCount: number;
+  dismiss: (taskId: string, date: string) => void;
 }
-const Ctx = createContext<ReminderCtx>({ ringing: [], ringingCount: 0 });
+const Ctx = createContext<ReminderCtx>({ ringing: [], ringingCount: 0, dismiss: () => {} });
 export const useReminders = () => useContext(Ctx);
 
 // Fases de aviso ya disparadas, en memoria (no necesita persistir).
@@ -28,64 +30,74 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
   const tasks = useStore((s) => s.tasks);
   const completions = useStore((s) => s.completions);
   const settings = useStore((s) => s.settings);
+  const userId = useStore((s) => s.userId);
+  const workspaceOwnerId = useStore((s) => s.workspaceOwnerId);
 
   const [ringing, setRinging] = useState<TaskInstance[]>([]);
   const phases = useRef<PhaseMap>({});
+  const dismissed = useRef<Record<string, number>>({});
+
+  // Los recordatorios son solo de TU propio calendario. Si estás gestionando el
+  // calendario de otra persona, no te bombardeamos con sus alarmas.
+  const isOwnCalendar = !!userId && workspaceOwnerId === userId;
 
   useEffect(() => {
     registerServiceWorker();
   }, []);
 
+  const dismiss = useCallback((taskId: string, date: string) => {
+    dismissed.current[`${taskId}:${date}`] = Date.now() + DISMISS_MS;
+    setRinging((prev) => prev.filter((i) => !(i.task.id === taskId && i.date === date)));
+  }, []);
+
   const tick = useCallback(() => {
+    if (!isOwnCalendar) {
+      setRinging([]);
+      return;
+    }
     const now = new Date();
     const todayKey = dateKey(now);
     const today = instancesForDate(tasks, todayKey, completions, now);
-    const overdue = overdueSingles(tasks, completions, now);
-    const candidates = [...overdue, ...today];
 
     const nowRinging: TaskInstance[] = [];
 
-    for (const inst of candidates) {
+    for (const inst of today) {
       if (inst.status !== 'pendiente') continue;
+      // Solo avisamos por tareas con HORA concreta. Las tareas sin hora quedan
+      // visibles en la lista, pero no interrumpen ni suenan.
+      if (!inst.dueAt) continue;
+      if ((dismissed.current[`${inst.task.id}:${inst.date}`] ?? 0) > now.getTime()) continue;
+
       const key = `${inst.task.id}:${inst.date}`;
       const phase = (phases.current[key] ??= {});
       const isUrgent = inst.task.priority === 'urgente';
       const repeatMin = isUrgent ? settings.repeatEveryUrgentMin : settings.repeatEveryMin;
 
-      if (inst.dueAt) {
-        const dueMs = inst.dueAt.getTime();
-        const preMs = dueMs - settings.preNotifyMin * 60_000;
+      const dueMs = inst.dueAt.getTime();
+      const preMs = dueMs - settings.preNotifyMin * 60_000;
 
-        // Aviso previo (una vez).
-        if (now.getTime() >= preMs && now.getTime() < dueMs && !phase.pre) {
-          phase.pre = true;
-          notify(`⏰ Pronto: ${inst.task.title}`, `Falta poco (${inst.task.time}).`, false);
-        }
+      // Aviso previo (una sola vez, sin sonido).
+      if (now.getTime() >= preMs && now.getTime() < dueMs && !phase.pre) {
+        phase.pre = true;
+        notify(`⏰ Pronto: ${inst.task.title}`, `Falta poco (${inst.task.time}).`, false);
+      }
 
-        // En hora o vencida: insiste.
-        if (now.getTime() >= dueMs) {
-          nowRinging.push(inst);
-          const since = phase.lastDue ?? 0;
-          if (now.getTime() - since >= repeatMin * 60_000) {
-            phase.lastDue = now.getTime();
-            notify(
-              `${isUrgent ? '🔴 URGENTE: ' : '🔔 '}${inst.task.title}`,
-              inst.isOverdue ? '¡Tarea vencida! Marcala como hecha o posponé.' : 'Es la hora de esta tarea.',
-              true
-            );
-          }
-        }
-      } else if (inst.isOverdue) {
-        // Vencida sin hora concreta: visible en modo enfoque, aviso 1 vez.
+      // En hora o pasada: insiste (con tope de tiempo para no acosar todo el día).
+      const minutesLate = (now.getTime() - dueMs) / 60_000;
+      if (minutesLate >= 0 && minutesLate <= 120) {
         nowRinging.push(inst);
-        if (!phase.lastDue) {
+        const since = phase.lastDue ?? 0;
+        if (now.getTime() - since >= repeatMin * 60_000) {
           phase.lastDue = now.getTime();
-          notify(`🔔 Pendiente: ${inst.task.title}`, 'Tenés una tarea sin completar.', false);
+          notify(
+            `${isUrgent ? '🔴 URGENTE: ' : '🔔 '}${inst.task.title}`,
+            minutesLate < 1 ? 'Es la hora de esta tarea.' : 'Sigue pendiente. Marcala o posponé.',
+            true
+          );
         }
       }
     }
 
-    // Ordena por prioridad/vencimiento para mostrar la más importante arriba.
     nowRinging.sort((a, b) => {
       const pa = a.task.priority === 'urgente' ? 0 : 1;
       const pb = b.task.priority === 'urgente' ? 0 : 1;
@@ -98,13 +110,12 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
       if (settings.notificationsEnabled) {
         showSystemNotification(title, { body, tag: title, renotify: true, requireInteraction: insist });
       }
-      // Fallbacks con la app abierta (clave en iPhone).
       if (insist) {
         if (settings.soundEnabled) beep();
         if (settings.vibrationEnabled) vibrate([200, 100, 200]);
       }
     }
-  }, [tasks, completions, settings]);
+  }, [tasks, completions, settings, isOwnCalendar]);
 
   useEffect(() => {
     tick();
@@ -118,6 +129,8 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
   }, [tick]);
 
   return (
-    <Ctx.Provider value={{ ringing, ringingCount: ringing.length }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ ringing, ringingCount: ringing.length, dismiss }}>
+      {children}
+    </Ctx.Provider>
   );
 }
