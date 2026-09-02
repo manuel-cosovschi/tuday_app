@@ -6,7 +6,7 @@ import { CalendarDays, ListTodo, Repeat, Settings } from 'lucide-react';
 
 const items = [
   { href: '/', label: 'Hoy', Icon: ListTodo },
-  { href: '/semana', label: 'Semana', Icon: CalendarDays },
+  { href: '/semana', label: 'Calendario', Icon: CalendarDays },
   { href: '/habitos', label: 'Hábitos', Icon: Repeat },
   { href: '/ajustes', label: 'Ajustes', Icon: Settings },
 ];
