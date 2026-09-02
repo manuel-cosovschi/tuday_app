@@ -22,6 +22,22 @@ export interface Workspace {
   name: string;
   role: 'owner' | 'manager';
 }
+export interface SalaryRow {
+  owner_id: string;
+  member_id: string;
+  counterpart_name: string;
+  balance: number;
+  currency: string;
+  whatsapp: string | null;
+  i_am_owner: boolean;
+}
+export interface SalaryEntry {
+  id: string;
+  kind: 'credito' | 'pago' | 'ajuste';
+  amount: number;
+  note: string | null;
+  created_at: string;
+}
 export interface Manager {
   member_id: string;
   name: string | null;
@@ -117,6 +133,19 @@ interface State {
   loadManagers: () => Promise<Manager[]>;
   revokeManager: (memberId: string) => Promise<void>;
   leaveWorkspace: (ownerId: string) => Promise<void>;
+
+  // Sueldo
+  salaryOverview: () => Promise<SalaryRow[]>;
+  salaryEntries: (owner: string, member: string) => Promise<SalaryEntry[]>;
+  addSalaryEntry: (
+    owner: string,
+    member: string,
+    kind: 'credito' | 'ajuste',
+    amount: number,
+    note?: string
+  ) => Promise<void>;
+  settleSalary: (owner: string) => Promise<number>;
+  saveSalaryConfig: (currency: string, whatsapp: string) => Promise<void>;
 
   // migración de datos locales del MVP anterior
   importLocal: (tasks: Task[], completions: Completions) => Promise<number>;
@@ -456,6 +485,56 @@ export const useStore = create<State>()(
           }));
           set({ workspaces });
           if (get().workspaceOwnerId === owner) await get().switchWorkspace(get().userId!);
+        },
+
+        // ---------- Sueldo ----------
+        salaryOverview: async () => {
+          const { data, error } = await supabase.rpc('tuday_salary_overview');
+          if (error) throw error;
+          return (data ?? []).map((r: Row) => ({
+            ...r,
+            balance: Number(r.balance ?? 0),
+          })) as SalaryRow[];
+        },
+
+        salaryEntries: async (owner, member) => {
+          const { data, error } = await supabase.rpc('tuday_salary_entries_for', {
+            p_owner: owner,
+            p_member: member,
+          });
+          if (error) throw error;
+          return (data ?? []).map((r: Row) => ({
+            ...r,
+            amount: Number(r.amount ?? 0),
+          })) as SalaryEntry[];
+        },
+
+        addSalaryEntry: async (owner, member, kind, amount, note) => {
+          const { error } = await supabase.from('tuday_salary_entries').insert({
+            owner_id: owner,
+            member_id: member,
+            kind,
+            amount,
+            note: note ?? null,
+            created_by: get().userId,
+          });
+          if (error) throw error;
+        },
+
+        settleSalary: async (owner) => {
+          const { data, error } = await supabase.rpc('tuday_settle_salary', { p_owner: owner });
+          if (error) throw error;
+          return Number(data ?? 0);
+        },
+
+        saveSalaryConfig: async (currency, whatsapp) => {
+          const { error } = await supabase.from('tuday_salary_config').upsert({
+            owner_id: get().userId,
+            currency,
+            whatsapp: whatsapp || null,
+            updated_at: new Date().toISOString(),
+          });
+          if (error) throw error;
         },
 
         importLocal: async (tasks, completions) => {
