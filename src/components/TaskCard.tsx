@@ -20,12 +20,7 @@ export function TaskCard({
   const [open, setOpen] = useState(false);
 
   const recurring = task.type !== 'unica';
-  function handleDelete() {
-    const msg = recurring
-      ? `Eliminar "${task.title}" para TODOS los días. Esta acción no se puede deshacer. ¿Continuar?`
-      : `Eliminar "${task.title}". ¿Continuar?`;
-    if (window.confirm(msg)) deleteTask(task.id);
-  }
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const done = status === 'completada';
   const cancelled = status === 'cancelada';
@@ -34,7 +29,11 @@ export function TaskCard({
   return (
     <div
       className={`card relative overflow-hidden ${
-        isOverdue ? 'ring-2 ring-red-400/70 animate-pulseRing' : ''
+        isOverdue
+          ? task.priority === 'urgente'
+            ? 'ring-2 ring-red-400/70 animate-pulseRing'
+            : 'ring-1 ring-red-300/60'
+          : ''
       }`}
     >
       <span className={`absolute left-0 top-0 h-full w-1.5 ${PRIORITY_BAR[task.priority]}`} />
@@ -117,9 +116,20 @@ export function TaskCard({
               Editar
             </Action>
           )}
-          <Action onClick={handleDelete} icon={<Trash2 className="h-3.5 w-3.5" />} danger>
-            {recurring ? 'Eliminar serie' : 'Eliminar'}
-          </Action>
+          {confirmDelete ? (
+            <>
+              <Action onClick={() => deleteTask(task.id)} icon={<Trash2 className="h-3.5 w-3.5" />} danger>
+                {recurring ? 'Sí, borrar todos los días' : 'Sí, eliminar'}
+              </Action>
+              <Action onClick={() => setConfirmDelete(false)} icon={<X className="h-3.5 w-3.5" />}>
+                No
+              </Action>
+            </>
+          ) : (
+            <Action onClick={() => setConfirmDelete(true)} icon={<Trash2 className="h-3.5 w-3.5" />} danger>
+              {recurring ? 'Eliminar serie' : 'Eliminar'}
+            </Action>
+          )}
         </div>
       )}
     </div>
