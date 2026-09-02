@@ -181,22 +181,32 @@ export const useStore = create<State>()(
         }
         const user = session.user;
         const name = user.user_metadata?.name || (user.email ? user.email.split('@')[0] : 'Usuario');
-        set({ userId: user.id, profile: { name, email: user.email } });
+        // Desbloquear la UI de inmediato: NUNCA quedarse en "Cargando" por la red.
+        // Los datos se cargan a continuación; si la base falla, la app igual abre.
+        set({
+          userId: user.id,
+          profile: { name, email: user.email },
+          workspaceOwnerId: get().workspaceOwnerId ?? user.id,
+          ready: true,
+        });
 
-        // asegurar perfil
-        await supabase.from('tuday_profiles').upsert({ id: user.id, name, email: user.email });
-
-        // cargar workspaces
-        const { data: ws } = await supabase.rpc('tuday_my_workspaces');
-        const workspaces: Workspace[] = (ws ?? []).map((w: Row) => ({
-          owner_id: w.owner_id,
-          name: w.name,
-          role: w.role,
-        }));
-        set({ workspaces, workspaceOwnerId: user.id, ready: true });
-
-        await get().loadData();
-        subscribe(user.id);
+        try {
+          await supabase.from('tuday_profiles').upsert({ id: user.id, name, email: user.email });
+          const { data: ws } = await supabase.rpc('tuday_my_workspaces');
+          if (ws) {
+            set({
+              workspaces: (ws as Row[]).map((w) => ({
+                owner_id: w.owner_id,
+                name: w.name,
+                role: w.role,
+              })),
+            });
+          }
+          await get().loadData();
+          subscribe(get().workspaceOwnerId ?? user.id);
+        } catch {
+          // Sin conexión / base pausada: la app queda usable y reintenta al reconectar.
+        }
       }
 
       return {
@@ -211,10 +221,27 @@ export const useStore = create<State>()(
         settings: DEFAULT_SETTINGS,
 
         init: () => {
-          supabase.auth.getSession().then(({ data }) => handleSession(data.session));
+          // Failsafe: pase lo que pase, nunca quedarse en "Cargando…" más de 6s.
+          setTimeout(() => {
+            if (!get().ready) set({ ready: true });
+          }, 6000);
+          supabase.auth
+            .getSession()
+            .then(({ data }) => handleSession(data.session))
+            .catch(() => set({ ready: true }));
           supabase.auth.onAuthStateChange((_event, session) => {
             handleSession(session);
           });
+          // Reintentar cargar datos cuando vuelve la conexión o se reabre la app.
+          if (typeof window !== 'undefined') {
+            const retry = () => {
+              if (get().userId) get().loadData();
+            };
+            window.addEventListener('online', retry);
+            document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState === 'visible') retry();
+            });
+          }
         },
 
         signUp: async (email, password, name) => {
