@@ -4,7 +4,7 @@ name: Supabase keep-alive
 # Este ping periódico mantiene la base "despierta" para evitar cortes.
 on:
   schedule:
-    - cron: '0 */6 * * *' # cada 6 horas
+    - cron: '*/10 * * * *' # cada 10 minutos (best-effort; GitHub puede demorar/saltear)
   workflow_dispatch: {}
 
 jobs:
