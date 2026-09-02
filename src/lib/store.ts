@@ -135,6 +135,42 @@ interface State {
 let channel: RealtimeChannel | null = null;
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
+// --- Persistencia robusta de sesión ---
+// Guardamos un respaldo propio de la sesión para que un fallo transitorio
+// (base pausada / sin red) NO obligue a re-loguearse. Con entrar una vez alcanza.
+const AUTH_BACKUP_KEY = 'tuday-auth-backup';
+let userInitiatedLogout = false;
+
+function saveAuthBackup(session: any, name: string) {
+  try {
+    localStorage.setItem(
+      AUTH_BACKUP_KEY,
+      JSON.stringify({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        user: { id: session.user.id, email: session.user.email, name },
+      })
+    );
+  } catch {
+    /* noop */
+  }
+}
+function readAuthBackup(): any | null {
+  try {
+    const raw = localStorage.getItem(AUTH_BACKUP_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+function clearAuthBackup() {
+  try {
+    localStorage.removeItem(AUTH_BACKUP_KEY);
+  } catch {
+    /* noop */
+  }
+}
+
 export const useStore = create<State>()(
   persist(
     (set, get) => {
@@ -181,6 +217,7 @@ export const useStore = create<State>()(
         }
         const user = session.user;
         const name = user.user_metadata?.name || (user.email ? user.email.split('@')[0] : 'Usuario');
+        saveAuthBackup(session, name); // recordar la sesión de forma persistente
         // Desbloquear la UI de inmediato: NUNCA quedarse en "Cargando" por la red.
         // Los datos se cargan a continuación; si la base falla, la app igual abre.
         set({
@@ -225,17 +262,67 @@ export const useStore = create<State>()(
           setTimeout(() => {
             if (!get().ready) set({ ready: true });
           }, 6000);
+
           supabase.auth
             .getSession()
-            .then(({ data }) => handleSession(data.session))
+            .then(({ data }) => {
+              if (data.session) {
+                handleSession(data.session);
+                return;
+              }
+              // Sin sesión activa: intentar restaurar desde nuestro respaldo.
+              const b = readAuthBackup();
+              if (b?.refresh_token && b?.user) {
+                // Mostrar la app YA logueada (sin pedir credenciales)...
+                set({
+                  userId: b.user.id,
+                  profile: { name: b.user.name, email: b.user.email },
+                  workspaceOwnerId: get().workspaceOwnerId ?? b.user.id,
+                  ready: true,
+                });
+                // ...y restaurar la sesión de Supabase en segundo plano.
+                supabase.auth
+                  .setSession({ access_token: b.access_token, refresh_token: b.refresh_token })
+                  .then(({ data }) => {
+                    if (data.session) handleSession(data.session);
+                    else get().loadData();
+                  })
+                  .catch(() => get().loadData());
+              } else {
+                set({ ready: true }); // realmente no hay sesión → login
+              }
+            })
             .catch(() => set({ ready: true }));
-          supabase.auth.onAuthStateChange((_event, session) => {
-            handleSession(session);
+
+          supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_OUT') {
+              // Solo desloguear si el usuario lo pidió. Un deslogueo por fallo
+              // transitorio (base pausada/sin red) se ignora para no molestar.
+              if (userInitiatedLogout) {
+                clearAuthBackup();
+                handleSession(null);
+              }
+              return;
+            }
+            if (session) handleSession(session);
           });
-          // Reintentar cargar datos cuando vuelve la conexión o se reabre la app.
+
+          // Al volver la conexión o reabrir la app: reasegurar sesión y recargar.
           if (typeof window !== 'undefined') {
-            const retry = () => {
-              if (get().userId) get().loadData();
+            const retry = async () => {
+              if (!get().userId) return;
+              const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }) as any);
+              if (data?.session) {
+                get().loadData();
+              } else {
+                const b = readAuthBackup();
+                if (b?.refresh_token) {
+                  supabase.auth
+                    .setSession({ access_token: b.access_token, refresh_token: b.refresh_token })
+                    .then(() => get().loadData())
+                    .catch(() => {});
+                }
+              }
             };
             window.addEventListener('online', retry);
             document.addEventListener('visibilitychange', () => {
@@ -270,7 +357,15 @@ export const useStore = create<State>()(
         },
 
         logout: async () => {
-          await supabase.auth.signOut();
+          userInitiatedLogout = true;
+          clearAuthBackup();
+          try {
+            await supabase.auth.signOut();
+          } catch {
+            /* noop */
+          }
+          handleSession(null);
+          userInitiatedLogout = false;
         },
 
         loadData: async () => {
