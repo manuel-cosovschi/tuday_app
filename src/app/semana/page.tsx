@@ -9,12 +9,14 @@ import { addDays } from 'date-fns';
 import { TaskCard } from '@/components/TaskCard';
 import { AddTaskModal } from '@/components/AddTaskModal';
 import { ProgressBar, Fab } from '@/components/ui-bits';
+import { MonthView } from '@/components/MonthView';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 export default function WeekPage() {
   const tasks = useStore((s) => s.tasks);
   const completions = useStore((s) => s.completions);
 
+  const [view, setView] = useState<'semana' | 'mes'>('semana');
   const [offset, setOffset] = useState(0); // semanas respecto a hoy
   const [modal, setModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -66,7 +68,30 @@ export default function WeekPage() {
   return (
     <main className="px-4 pt-6">
       <div className="mb-3 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Semana</h1>
+        <h1 className="text-2xl font-bold">Calendario</h1>
+        {/* Selector Semana / Mes */}
+        <div className="flex rounded-xl bg-slate-100 p-0.5 dark:bg-slate-800">
+          {(['semana', 'mes'] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition ${
+                view === v
+                  ? 'bg-[var(--card)] text-indigo-600 shadow-sm dark:text-indigo-300'
+                  : 'text-slate-500'
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {view === 'mes' ? (
+        <MonthView />
+      ) : (
+        <>
+      <div className="mb-3 flex items-center justify-end">
         <div className="flex items-center gap-1">
           <button onClick={() => setOffset((o) => o - 1)} className="rounded-lg p-2 text-slate-400">
             <ChevronLeft className="h-5 w-5" />
@@ -137,6 +162,8 @@ export default function WeekPage() {
         editId={editId}
         defaultDate={newDate}
       />
+        </>
+      )}
     </main>
   );
 }
