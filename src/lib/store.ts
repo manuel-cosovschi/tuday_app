@@ -31,6 +31,17 @@ export interface SalaryRow {
   whatsapp: string | null;
   i_am_owner: boolean;
 }
+export interface Receipt {
+  id: string;
+  number: number;
+  amount: number;
+  balance_before: number;
+  balance_after: number;
+  method: string | null;
+  note: string | null;
+  source: string;
+  issued_at: string;
+}
 export interface SalaryEntry {
   id: string;
   kind: 'credito' | 'pago' | 'ajuste';
@@ -146,6 +157,14 @@ interface State {
   ) => Promise<void>;
   settleSalary: (owner: string) => Promise<number>;
   saveSalaryConfig: (currency: string, whatsapp: string) => Promise<void>;
+  registerPayment: (
+    member: string,
+    amount: number,
+    method?: string,
+    note?: string
+  ) => Promise<Receipt>;
+  receiptsFor: (owner: string, member: string) => Promise<Receipt[]>;
+  voidReceipt: (id: string) => Promise<void>;
 
   // migración de datos locales del MVP anterior
   importLocal: (tasks: Task[], completions: Completions) => Promise<number>;
@@ -525,6 +544,42 @@ export const useStore = create<State>()(
           const { data, error } = await supabase.rpc('tuday_settle_salary', { p_owner: owner });
           if (error) throw error;
           return Number(data ?? 0);
+        },
+
+        registerPayment: async (member, amount, method, note) => {
+          const { data, error } = await supabase.rpc('tuday_register_payment', {
+            p_member: member,
+            p_amount: amount,
+            p_method: method ?? null,
+            p_note: note ?? null,
+          });
+          if (error) throw error;
+          const r = (Array.isArray(data) ? data[0] : data) as Row;
+          return {
+            ...r,
+            amount: Number(r.amount),
+            balance_before: Number(r.balance_before),
+            balance_after: Number(r.balance_after),
+          } as Receipt;
+        },
+
+        receiptsFor: async (owner, member) => {
+          const { data, error } = await supabase.rpc('tuday_receipts_for', {
+            p_owner: owner,
+            p_member: member,
+          });
+          if (error) throw error;
+          return (data ?? []).map((r: Row) => ({
+            ...r,
+            amount: Number(r.amount),
+            balance_before: Number(r.balance_before),
+            balance_after: Number(r.balance_after),
+          })) as Receipt[];
+        },
+
+        voidReceipt: async (id) => {
+          const { error } = await supabase.rpc('tuday_void_receipt', { p_receipt: id });
+          if (error) throw error;
         },
 
         saveSalaryConfig: async (currency, whatsapp) => {
