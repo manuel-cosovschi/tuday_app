@@ -37,7 +37,10 @@ export function resolveStatus(
   now: Date = new Date()
 ): { status: Status; record?: DayRecord } {
   const record = completions[task.id]?.[key];
-  let status: Status = task.type === 'unica' ? task.status : record?.status ?? 'pendiente';
+  // El registro del día manda para TODOS los tipos. Antes, en tareas únicas
+  // mandaba task.status: si la escritura en la tabla de tareas tardaba un
+  // instante más que la del registro, la recarga la volvía a mostrar sin tildar.
+  let status: Status = record?.status ?? (task.type === 'unica' ? task.status : 'pendiente');
 
   if (status === 'pospuesta' && record?.snoozedUntil && now >= parseISO(record.snoozedUntil)) {
     status = 'pendiente';
@@ -89,13 +92,7 @@ export function overdueSingles(
 ): TaskInstance[] {
   const todayKey = dateKey(now);
   return tasks
-    .filter(
-      (t) =>
-        t.type === 'unica' &&
-        !t.archived &&
-        t.status === 'pendiente' &&
-        t.dueDate &&
-        t.dueDate < todayKey
-    )
-    .map((t) => buildInstance(t, t.dueDate!, completions, now));
+    .filter((t) => t.type === 'unica' && !t.archived && t.dueDate && t.dueDate < todayKey)
+    .map((t) => buildInstance(t, t.dueDate!, completions, now))
+    .filter((i) => i.status === 'pendiente');
 }

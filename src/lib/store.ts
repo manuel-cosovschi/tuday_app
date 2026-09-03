@@ -649,8 +649,15 @@ export const useStore = create<State>()(
           ).then(({ error }) => {
             if (error) get().loadData();
           });
+          // Espejo en la tabla de tareas (el registro del día es la fuente de verdad).
           if (task.type === 'unica') {
-            void supabase.from('tuday_tasks').update({ status }).eq('id', task.id);
+            void supabase
+              .from('tuday_tasks')
+              .update({ status })
+              .eq('id', task.id)
+              .then(({ error }) => {
+                if (error) get().loadData();
+              });
           }
         },
 
